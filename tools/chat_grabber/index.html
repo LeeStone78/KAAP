@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KAAP Chat Grabber — Chat Log Capture</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel2: #1c232c;
+      --text: #c9d1d9;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent-soft: #58a6ff20;
+      --user: #f78166;
+      --user-soft: #f7816620;
+      --ai: #56d364;
+      --ai-soft: #56d36420;
+      --border: #30363d;
+      --success: #2ea043;
+      --warn: #d29922;
+      --danger: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0; padding: 24px; line-height: 1.6;
+    }
+    .container { max-width: 980px; margin: 0 auto; }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .title-block h1 { color: var(--accent); margin: 0 0 4px; font-weight: 600; font-size: 24px; }
+    .tagline { color: var(--muted); margin: 0; font-size: 13px; }
+    .stats { color: var(--muted); font-size: 13px; text-align: right; }
+    .stats strong { color: var(--text); font-weight: 600; }
+    .help {
+      background: var(--accent-soft);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    .help strong { color: var(--accent); }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    section h2 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    label {
+      display: block;
+      margin: 0 0 5px;
+      font-weight: 500;
+      color: var(--text);
+      font-size: 13px;
+    }
+    label .hint { color: var(--muted); font-weight: normal; font-size: 12px; }
+    input[type="text"], select, textarea {
+      width: 100%;
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+      font-size: 13px;
+    }
+    input[type="text"]:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    textarea { resize: vertical; min-height: 130px; line-height: 1.5; }
+    .row-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .field-row { margin-bottom: 12px; }
+    .field-row:last-child { margin-bottom: 0; }
+    .button-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 9px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.05s;
+    }
+    button:hover { background: #4a8de0; }
+    button:active { transform: translateY(1px); }
+    button.secondary {
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.secondary:hover { background: #2a323b; }
+    button.success { background: var(--success); }
+    button.success:hover { background: #259139; }
+    button.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+    button.danger:hover { background: var(--danger); color: #fff; }
+    button.small { padding: 6px 12px; font-size: 12px; }
+    .next-speaker {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+    .next-speaker.user { background: var(--user-soft); color: var(--user); }
+    .next-speaker.ai { background: var(--ai-soft); color: var(--ai); }
+    .toggle-button {
+      background: var(--panel2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .toggle-button:hover { color: var(--text); }
+    .status {
+      display: inline-block;
+      padding: 6px 0 0;
+      color: var(--success);
+      font-size: 12px;
+      min-height: 1em;
+    }
+    .status.warn { color: var(--warn); }
+    .status.error { color: var(--danger); }
+    .modal-bg {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-bg.visible { display: flex; }
+    .modal {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 800px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h3 { margin: 0; color: var(--accent); font-size: 15px; }
+    .modal-header .close {
+      background: transparent;
+      color: var(--muted);
+      border: none;
+      cursor: pointer;
+      font-size: 22px;
+      padding: 0 6px;
+    }
+    .modal-body { padding: 18px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+    .messages-list {
+      max-height: 60vh;
+      overflow-y: auto;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px;
+    }
+    .message-item {
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+      border-left: 3px solid var(--border);
+      background: var(--bg);
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .message-item:last-child { margin-bottom: 0; }
+    .message-item.user { border-left-color: var(--user); }
+    .message-item.ai { border-left-color: var(--ai); }
+    .message-item .meta {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .message-item .meta .speaker { font-weight: 600; text-transform: uppercase; }
+    .message-item .meta .speaker.user { color: var(--user); }
+    .message-item .meta .speaker.ai { color: var(--ai); }
+    .message-item .meta .vol { color: var(--muted); }
+    .message-item .delete-btn {
+      background: transparent;
+      color: var(--danger);
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      margin-left: auto;
+      padding: 0 4px;
+    }
+    footer {
+      margin-top: 28px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+    .hidden { display: none !important; }
+    code { background: var(--panel2); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- ============================================================
+         INITIAL / PROJECT SETUP SCREEN
+         ============================================================ -->
+    <div id="setup-screen">
+      <header>
+        <div class="title-block">
+          <h1>KAAP Chat Grabber</h1>
+          <p class="tagline">Capture chat logs message-by-message. Auto-alternates user/AI, deduplicates, splits volumes.</p>
+        </div>
+      </header>
+
+      <div class="help">
+        <strong>How this works:</strong> create a project, then paste messages from a chat one at a time. The tool auto-alternates between User and AI as you go. Detects duplicate pastes. Saves to your browser's local storage so you can come back later. Export as Markdown when you're done.
+      </div>
+
+      <section>
+        <h2>New Project</h2>
+        <div class="row-grid">
+          <div class="field-row">
+            <label>Project name <span class="hint">(e.g. an AI's name, or a topic)</span></label>
+            <input type="text" id="setup-project-name" placeholder="My AI" />
+          </div>
+          <div class="field-row">
+            <label>Platform / source</label>
+            <select id="setup-platform">
+              <option value="Claude">Claude</option>
+              <option value="ChatGPT">ChatGPT</option>
+              <option value="Gemini">Gemini</option>
+              <option value="Grok">Grok</option>
+              <option value="Local model">Local model</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row" id="other-platform-wrapper" style="display:none;">
+          <label>Platform name</label>
+          <input type="text" id="setup-platform-other" placeholder="Specify platform" />
+        </div>
+        <div class="button-row">
+          <button onclick="startProject()">Start project</button>
+          <button class="secondary" onclick="loadFromStorage()">Load existing project</button>
+        </div>
+        <div id="setup-status" class="status"></div>
+      </section>
+
+      <section id="existing-projects-section" style="display:none;">
+        <h2>Existing Projects</h2>
+        <div id="existing-projects"></div>
+      </section>
+    </div>
+
+    <!-- ============================================================
+         WORKING SCREEN
+         ============================================================ -->
+    <div id="work-screen" class="hidden">
+      <header>
+        <div class="title-block">
+          <h1 id="work-project-name">Project</h1>
+          <p class="tagline" id="work-project-meta">Platform · 0 messages · Volume 1</p>
+        </div>
+        <div class="stats" id="work-stats">
+          <strong>0</strong> total · <span style="color:var(--user)"><strong>0</strong> user</span> · <span style="color:var(--ai)"><strong>0</strong> AI</span>
+        </div>
+      </header>
+
+      <section>
+        <h2>Paste next message
+          <span class="next-speaker" id="next-speaker-pill">User</span>
+          <button class="toggle-button" onclick="toggleNextSpeaker()" style="margin-left:8px;">Switch</button>
+        </h2>
+        <textarea id="paste-input" placeholder="Paste the next message from the chat here..."></textarea>
+        <div class="button-row">
+          <button onclick="addMessage()">Add message</button>
+          <button class="secondary" onclick="pasteFromClipboard()">Paste from clipboard</button>
+          <button class="secondary" onclick="clearPasteInput()">Clear input</button>
+        </div>
+        <div id="paste-status" class="status"></div>
+      </section>
+
+      <section>
+        <h2>Project actions</h2>
+        <div class="button-row">
+          <button class="secondary" onclick="showAllMessages()">View all messages</button>
+          <button class="secondary" onclick="newVolume()">Start new volume</button>
+          <button class="success" onclick="showExport()">Export</button>
+          <button class="secondary" onclick="showSettings()">Settings</button>
+          <button class="secondary" onclick="manualSave()">Manual save</button>
+          <button class="secondary" onclick="backToSetup()">Switch project</button>
+        </div>
+        <div id="action-status" class="status"></div>
+      </section>
+    </div>
+
+    <footer>
+      Part of the <a href="https://github.com/LeeStone78/kaap" target="_blank" rel="noopener">KAAP project</a>. Single-file HTML — runs offline, stores in your browser, no tracking, no network calls. MIT licensed.
+    </footer>
+  </div>
+
+  <!-- ============================================================
+       MODALS
+       ============================================================ -->
+  <div class="modal-bg" id="modal-view">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>All messages</h3>
+        <button class="close" onclick="closeModal('modal-view')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="messages-list" id="messages-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="modal-export">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Export</h3>
+        <button class="close" onclick="closeModal('modal-export')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-row">
+          <label>Format</label>
+          <select id="export-format">
+            <option value="markdown">Markdown (.md)</option>
+            <option value="json">JSON (.json)</option>
+            <option value="text">Plain text (.txt)</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label>Filename <span class="hint">(without extension)</span></label>
+          <input type="text" id="export-filename" />
+        </div>
+        <div class="field-row">
+          <label>Scope</label>
+          <select id="export-scope">
+            <option value="all">All messages, all volumes</option>
+            <option value="current">Current volume only</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="secondary" onclick="closeModal('modal-export')">Cancel</button>
+        <button class="success" onclick="executeExport()">Download</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="modal-settings">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button class="close" onclick="closeModal('modal-settings')">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="field-row">
+          <label>Project name</label>
+          <input type="text" id="settings-project-name" />
+        </div>
+        <div class="field-row">
+          <label>Platform</label>
+          <input type="text" id="settings-platform" />
+        </div>
+        <div class="field-row">
+          <label>Volume size threshold (messages per volume)</label>
+          <input type="text" id="settings-vol-threshold" placeholder="50" />
+        </div>
+        <div class="field-row" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border)">
+          <button class="danger" onclick="deleteCurrentProject()">Delete this project permanently</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="secondary" onclick="closeModal('modal-settings')">Cancel</button>
+        <button class="success" onclick="saveSettings()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // STATE
+    // ============================================================
+    const STORAGE_PREFIX = 'kaap_chat_grabber_';
+    const STORAGE_INDEX = 'kaap_chat_grabber_INDEX';
+
+    let project = null; // { name, platform, messages: [{speaker, content, timestamp, volume}], currentVolume, volumeThreshold, nextSpeaker }
+
+    // ============================================================
+    // SETUP / PROJECT MANAGEMENT
+    // ============================================================
+    document.getElementById('setup-platform').addEventListener('change', (e) => {
+      document.getElementById('other-platform-wrapper').style.display =
+        e.target.value === 'Other' ? 'block' : 'none';
+    });
+
+    function getIndex() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_INDEX) || '[]'); }
+      catch (_) { return []; }
+    }
+    function setIndex(list) {
+      localStorage.setItem(STORAGE_INDEX, JSON.stringify(list));
+    }
+
+    function startProject() {
+      const name = document.getElementById('setup-project-name').value.trim();
+      const platformSel = document.getElementById('setup-platform').value;
+      const platformOther = document.getElementById('setup-platform-other').value.trim();
+      const platform = platformSel === 'Other' ? (platformOther || 'Other') : platformSel;
+      const status = document.getElementById('setup-status');
+
+      if (!name) {
+        status.className = 'status error';
+        status.textContent = 'Project name is required.';
+        return;
+      }
+      // Use a slug for storage key; allow re-opening existing
+      const key = STORAGE_PREFIX + slugify(name);
+      let existing = null;
+      try { existing = JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) {}
+      if (existing) {
+        project = existing;
+      } else {
+        project = {
+          name, platform,
+          messages: [],
+          currentVolume: 1,
+          volumeThreshold: 50,
+          nextSpeaker: 'user'
+        };
+        const idx = getIndex();
+        if (!idx.includes(key)) { idx.push(key); setIndex(idx); }
+      }
+      project.__key = key;
+      saveProject();
+      enterWorkScreen();
+    }
+
+    function slugify(s) {
+      return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function loadFromStorage() {
+      const idx = getIndex();
+      const list = document.getElementById('existing-projects');
+      const wrap = document.getElementById('existing-projects-section');
+      if (idx.length === 0) {
+        wrap.style.display = 'block';
+        list.innerHTML = '<p style="color:var(--muted);font-size:13px;">No saved projects in this browser.</p>';
+        return;
+      }
+      list.innerHTML = '';
+      idx.forEach(key => {
+        let data;
+        try { data = JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) { return; }
+        if (!data) return;
+        const div = document.createElement('div');
+        div.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;margin-bottom:6px';
+        div.innerHTML = `
+          <div>
+            <strong style="color:var(--text)">${escapeHtml(data.name)}</strong>
+            <div style="color:var(--muted);font-size:12px">${escapeHtml(data.platform)} · ${data.messages.length} messages · Volume ${data.currentVolume}</div>
+          </div>
+          <div>
+            <button class="small" onclick="openProject('${key}')">Open</button>
+            <button class="small secondary" onclick="deleteProjectByKey('${key}', this)">×</button>
+          </div>`;
+        list.appendChild(div);
+      });
+      wrap.style.display = 'block';
+    }
+
+    function openProject(key) {
+      try {
+        project = JSON.parse(localStorage.getItem(key));
+        project.__key = key;
+        enterWorkScreen();
+      } catch (e) {
+        document.getElementById('setup-status').className = 'status error';
+        document.getElementById('setup-status').textContent = 'Could not load project.';
+      }
+    }
+
+    function deleteProjectByKey(key, btn) {
+      if (!confirm('Delete this project permanently? Cannot be undone.')) return;
+      localStorage.removeItem(key);
+      setIndex(getIndex().filter(k => k !== key));
+      btn.closest('div').parentNode.remove();
+    }
+
+    function deleteCurrentProject() {
+      if (!project) return;
+      if (!confirm(`Delete "${project.name}" permanently? Cannot be undone.`)) return;
+      localStorage.removeItem(project.__key);
+      setIndex(getIndex().filter(k => k !== project.__key));
+      project = null;
+      backToSetup();
+      closeModal('modal-settings');
+    }
+
+    function backToSetup() {
+      document.getElementById('work-screen').classList.add('hidden');
+      document.getElementById('setup-screen').classList.remove('hidden');
+      document.getElementById('setup-status').textContent = '';
+    }
+
+    // ============================================================
+    // WORK SCREEN
+    // ============================================================
+    function enterWorkScreen() {
+      document.getElementById('setup-screen').classList.add('hidden');
+      document.getElementById('work-screen').classList.remove('hidden');
+      refreshHeader();
+      refreshNextSpeakerPill();
+      document.getElementById('paste-input').focus();
+    }
+
+    function refreshHeader() {
+      document.getElementById('work-project-name').textContent = project.name;
+      const userCount = project.messages.filter(m => m.speaker === 'user').length;
+      const aiCount = project.messages.filter(m => m.speaker === 'ai').length;
+      document.getElementById('work-project-meta').textContent =
+        `${project.platform} · ${project.messages.length} messages · Volume ${project.currentVolume}`;
+      document.getElementById('work-stats').innerHTML =
+        `<strong>${project.messages.length}</strong> total · ` +
+        `<span style="color:var(--user)"><strong>${userCount}</strong> user</span> · ` +
+        `<span style="color:var(--ai)"><strong>${aiCount}</strong> AI</span>`;
+    }
+
+    function refreshNextSpeakerPill() {
+      const pill = document.getElementById('next-speaker-pill');
+      pill.textContent = project.nextSpeaker === 'user' ? 'User' : 'AI';
+      pill.className = 'next-speaker ' + project.nextSpeaker;
+    }
+
+    function toggleNextSpeaker() {
+      project.nextSpeaker = project.nextSpeaker === 'user' ? 'ai' : 'user';
+      refreshNextSpeakerPill();
+      saveProject();
+    }
+
+    function addMessage() {
+      const ta = document.getElementById('paste-input');
+      const content = ta.value.trim();
+      const status = document.getElementById('paste-status');
+      if (!content) {
+        status.className = 'status error';
+        status.textContent = 'Paste a message first.';
+        return;
+      }
+      // Duplicate check against last message
+      const last = project.messages[project.messages.length - 1];
+      if (last && last.content.trim() === content) {
+        if (!confirm('This is identical to the previous message — add anyway?')) {
+          status.className = 'status warn';
+          status.textContent = 'Duplicate detected, not added.';
+          return;
+        }
+      }
+      const speaker = project.nextSpeaker;
+      project.messages.push({
+        speaker,
+        content,
+        timestamp: new Date().toISOString(),
+        volume: project.currentVolume
+      });
+      // Auto-flip speaker
+      project.nextSpeaker = speaker === 'user' ? 'ai' : 'user';
+      // Auto-volume split
+      const inCurrentVolume = project.messages.filter(m => m.volume === project.currentVolume).length;
+      if (inCurrentVolume >= project.volumeThreshold) {
+        project.currentVolume += 1;
+        status.className = 'status warn';
+        status.textContent = `Added (${speaker.toUpperCase()}). Volume threshold reached — moved to Volume ${project.currentVolume}.`;
+      } else {
+        status.className = 'status';
+        status.textContent = `Added as ${speaker.toUpperCase()}. Next: ${project.nextSpeaker.toUpperCase()}.`;
+      }
+      ta.value = '';
+      ta.focus();
+      saveProject();
+      refreshHeader();
+      refreshNextSpeakerPill();
+    }
+
+    function newVolume() {
+      project.currentVolume += 1;
+      saveProject();
+      refreshHeader();
+      const status = document.getElementById('action-status');
+      status.className = 'status';
+      status.textContent = `Started Volume ${project.currentVolume}.`;
+      setTimeout(() => { status.textContent = ''; }, 3000);
+    }
+
+    async function pasteFromClipboard() {
+      const status = document.getElementById('paste-status');
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text) {
+          status.className = 'status warn';
+          status.textContent = 'Clipboard is empty.';
+          return;
+        }
+        document.getElementById('paste-input').value = text;
+        status.className = 'status';
+        status.textContent = 'Pasted from clipboard. Review and click Add Message.';
+      } catch (e) {
+        status.className = 'status error';
+        status.textContent = 'Clipboard access denied. Paste manually with Ctrl+V.';
+      }
+    }
+
+    function clearPasteInput() {
+      document.getElementById('paste-input').value = '';
+      document.getElementById('paste-input').focus();
+    }
+
+    function manualSave() {
+      saveProject();
+      const status = document.getElementById('action-status');
+      status.className = 'status';
+      status.textContent = 'Saved to browser storage.';
+      setTimeout(() => { status.textContent = ''; }, 2500);
+    }
+
+    function saveProject() {
+      if (!project || !project.__key) return;
+      const { __key, ...data } = project;
+      localStorage.setItem(__key, JSON.stringify(data));
+    }
+
+    // ============================================================
+    // VIEW ALL
+    // ============================================================
+    function showAllMessages() {
+      const list = document.getElementById('messages-list');
+      if (project.messages.length === 0) {
+        list.innerHTML = '<p style="color:var(--muted);padding:20px;text-align:center;">No messages yet.</p>';
+      } else {
+        list.innerHTML = project.messages.map((m, idx) => `
+          <div class="message-item ${m.speaker}">
+            <div class="meta">
+              <span class="speaker ${m.speaker}">${m.speaker}</span>
+              <span class="vol">Vol ${m.volume}</span>
+              <span class="vol">${new Date(m.timestamp).toLocaleString()}</span>
+              <button class="delete-btn" onclick="deleteMessage(${idx})" title="Delete this message">×</button>
+            </div>
+            ${escapeHtml(m.content).slice(0, 800) + (m.content.length > 800 ? '...' : '')}
+          </div>
+        `).join('');
+      }
+      openModal('modal-view');
+    }
+
+    function deleteMessage(idx) {
+      if (!confirm('Delete this message?')) return;
+      project.messages.splice(idx, 1);
+      saveProject();
+      refreshHeader();
+      showAllMessages();
+    }
+
+    // ============================================================
+    // EXPORT
+    // ============================================================
+    function showExport() {
+      document.getElementById('export-filename').value =
+        `${slugify(project.name)}_chat_log_${new Date().toISOString().slice(0,10)}`;
+      openModal('modal-export');
+    }
+
+    function executeExport() {
+      const fmt = document.getElementById('export-format').value;
+      const fname = (document.getElementById('export-filename').value || 'chat_log').replace(/\.\w+$/, '');
+      const scope = document.getElementById('export-scope').value;
+      const messages = scope === 'current'
+        ? project.messages.filter(m => m.volume === project.currentVolume)
+        : project.messages;
+
+      let content, ext, mime;
+      if (fmt === 'json') {
+        content = JSON.stringify({
+          project: project.name,
+          platform: project.platform,
+          exported: new Date().toISOString(),
+          messages
+        }, null, 2);
+        ext = 'json';
+        mime = 'application/json';
+      } else if (fmt === 'text') {
+        content = messages.map(m =>
+          `[${m.speaker.toUpperCase()} · Vol ${m.volume} · ${m.timestamp}]\n${m.content}\n`
+        ).join('\n---\n\n');
+        ext = 'txt';
+        mime = 'text/plain';
+      } else {
+        // markdown
+        content =
+          `# ${project.name} — Chat Log\n\n` +
+          `**Platform:** ${project.platform}\n` +
+          `**Exported:** ${new Date().toISOString()}\n` +
+          `**Scope:** ${scope === 'current' ? 'Volume ' + project.currentVolume + ' only' : 'All volumes'}\n` +
+          `**Messages:** ${messages.length}\n\n---\n\n` +
+          messages.map(m =>
+            `## ${m.speaker === 'user' ? 'User' : 'AI'}` +
+            ` — Vol ${m.volume} — ${new Date(m.timestamp).toLocaleString()}\n\n${m.content}\n`
+          ).join('\n---\n\n');
+        ext = 'md';
+        mime = 'text/markdown';
+      }
+      const blob = new Blob([content], { type: mime + ';charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${fname}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      closeModal('modal-export');
+      const status = document.getElementById('action-status');
+      status.className = 'status';
+      status.textContent = `Exported ${messages.length} messages as ${ext.toUpperCase()}.`;
+      setTimeout(() => { status.textContent = ''; }, 3500);
+    }
+
+    // ============================================================
+    // SETTINGS
+    // ============================================================
+    function showSettings() {
+      document.getElementById('settings-project-name').value = project.name;
+      document.getElementById('settings-platform').value = project.platform;
+      document.getElementById('settings-vol-threshold').value = project.volumeThreshold;
+      openModal('modal-settings');
+    }
+
+    function saveSettings() {
+      project.name = document.getElementById('settings-project-name').value.trim() || project.name;
+      project.platform = document.getElementById('settings-platform').value.trim() || project.platform;
+      const t = parseInt(document.getElementById('settings-vol-threshold').value, 10);
+      if (!isNaN(t) && t > 0) project.volumeThreshold = t;
+      saveProject();
+      refreshHeader();
+      closeModal('modal-settings');
+    }
+
+    // ============================================================
+    // MODAL HELPERS
+    // ============================================================
+    function openModal(id) { document.getElementById(id).classList.add('visible'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('visible'); }
+    document.querySelectorAll('.modal-bg').forEach(bg => {
+      bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('visible'); });
+    });
+
+    // ============================================================
+    // UTILITIES
+    // ============================================================
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Keyboard shortcut: Ctrl+Enter to add message
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (document.getElementById('work-screen').classList.contains('hidden')) return;
+        if (document.activeElement.id === 'paste-input') {
+          e.preventDefault();
+          addMessage();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
